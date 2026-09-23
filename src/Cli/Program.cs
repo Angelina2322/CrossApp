@@ -24,6 +24,7 @@ if (jsonOutput)
         RidReported = report.ReportedRid,
         BaseDirectory = report.BaseDirectory,
         CurrentDirectory = report.CurrentDirectory,
+        BuildNote = EnvironmentInfo.BuildNote,
         Domain
     };
     Console.WriteLine(JsonSerializer.Serialize(info, new JsonSerializerOptions { WriteIndented = true }));
@@ -42,6 +43,7 @@ else
     Console.WriteLine($"RID (від .NET)    : {report.ReportedRid}");
     Console.WriteLine($"Каталог застосунку: {report.BaseDirectory}");
     Console.WriteLine($"Поточний каталог  : {report.CurrentDirectory}");
+    Console.WriteLine($"Збірка Core       : {EnvironmentInfo.BuildNote}");
     Console.WriteLine(new string('-', 52));
     Console.WriteLine($"Предметна область: {Domain}");
 }
