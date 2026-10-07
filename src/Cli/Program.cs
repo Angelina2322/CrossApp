@@ -1,73 +1,58 @@
-﻿using Core.Dto;
-using Core.Import;
+﻿using System;
+using Core.Domain;
 
-string path = args.Length > 0 ? args[0] : Path.Combine("data", "sample.csv");
+// Встановлюємо кодування для коректного виводу українських літер
+Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-if (!File.Exists(path))
+// ==========================================
+// СЦЕНАРІЙ 1: УСПІХ
+// ==========================================
+Console.WriteLine("--- Сценарій 1: успіх ---");
+
+// Створення коректного товару через фабричний метод
+Product product = Product.Create("P-001", "sku-001", "Цемент М400 25кг", "шт", 100);
+Console.WriteLine(product);
+
+// Успішні операції приходу та видачі
+product.RegisterArrival(50);
+product.Issue(30);
+
+// Стан змінився: 100 + 50 - 30 = 120
+Console.WriteLine(product);
+
+Console.WriteLine();
+
+// ==========================================
+// СЦЕНАРІЙ 2: ПОРУШЕННЯ ІНВАРІАНТІВ
+// ==========================================
+Console.WriteLine("--- Сценарій 2: порушення інваріантів ---");
+
+// 1. Порушення інваріанту стану: видача більша за залишок (1000 при залишку 120)
+TryDo("видача більша за залишок", () => product.Issue(1000));
+
+// 2. Порушення інваріанту вхідних даних: передача порожнього рядка замість SKU
+TryDo("порожній SKU", () => Product.Create("P-002", "", "Пісок", "т", 10));
+
+// 3. Порушення діапазону значень: початковий залишок менший за нуль
+TryDo("від'ємний залишок", () => Product.Create("P-003", "SKU-003", "Цегла", "шт", -5));
+
+Console.WriteLine();
+Console.WriteLine($"Перевірка незмінності стану після помилок: {product}");
+
+// ==========================================
+// ДОПОМІЖНИЙ МЕТОД ДЛЯ ОБРОБКИ ВИКЛИКІВ
+// ==========================================
+static void TryDo(string title, Action action)
 {
-    Console.WriteLine($"Файл не знайдено: {Path.GetFullPath(path)}");
-    return 1;
-}
-
-string extension = Path.GetExtension(path).ToLowerInvariant();
-
-// Завдання 1: вибір імпортера за розширенням
-if (extension == ".json")
-{
-    ImportResult<ProductDto> jsonResult = ProductJsonImporter.Load(path);
-    DisplayResult(jsonResult, item => $"{item.Id,-6} {item.Sku,-10} {item.Name,-25} {item.Quantity,5} {item.Unit}");
-    PrintStatistics(jsonResult);
-    return 0;
-}
-
-// Завдання 2: якщо файл mixed.csv — запускаємо змішаний імпортер
-if (Path.GetFileName(path).Equals("mixed.csv", StringComparison.OrdinalIgnoreCase))
-{
-    ImportResult<IEntityDto> mixedResult = MixedCsvImporter.Load(path);
-    DisplayResult(mixedResult, item => item switch
+    try
     {
-        ProductDto p => $"[Товар] {p.Id,-6} {p.Sku,-10} {p.Name,-22} {p.Quantity,4} {p.Unit}",
-        WarehouseDto w => $"[Склад] {w.Id,-6} {w.Code,-10} {w.Location}",
-        _ => item.ToString() ?? string.Empty
-    });
-    PrintStatistics(mixedResult);
-    return 0;
-}
-
-// Стандартний CSV імпорт
-ImportResult<ProductDto> csvResult = ProductCsvImporter.Load(path);
-DisplayResult(csvResult, p => $"{p.Id,-6} {p.Sku,-10} {p.Name,-25} {p.Quantity,5} {p.Unit}");
-
-// Завдання 3: статистика імпорту одним рядком
-PrintStatistics(csvResult);
-
-return 0;
-
-static void DisplayResult<T>(ImportResult<T> result, Func<T, string> format)
-{
-    Console.WriteLine($"Завантажено записів: {result.Items.Count}");
-    foreach (T item in result.Items.Take(5))
-    {
-        Console.WriteLine($"  {format(item)}");
+        action();
+        // Якщо помилка не виникла — отже інваріант не спрацював
+        Console.WriteLine($"[-] {title}: виняток НЕ спрацював — інваріант відсутній!");
     }
-
-    if (result.Errors.Count > 0)
+    catch (Exception ex)
     {
-        Console.WriteLine($"\nПропущено рядків: {result.Errors.Count}");
-        foreach (string error in result.Errors)
-        {
-            Console.WriteLine($"  ! {error}");
-        }
+        // Виводимо лише назву винятку та зрозуміле повідомлення без стек-трейсу
+        Console.WriteLine($"[+] {title}: {ex.GetType().Name} — {ex.Message}");
     }
-}
-
-// Завдання 3: функція статистики
-static void PrintStatistics<T>(ImportResult<T> result)
-{
-    int accepted = result.Items.Count;
-    int skipped = result.Errors.Count;
-    int total = accepted + skipped;
-    double errorRate = total > 0 ? (double)skipped / total * 100 : 0.0;
-
-    Console.WriteLine($"\nСтатистика: Усього: {total} | Прийнято: {accepted} | Пропущено: {skipped} | Помилок: {errorRate:F1}%\n");
 }
