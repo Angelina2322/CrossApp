@@ -42,4 +42,6 @@ public sealed class CatalogService
     public Product? Find(string id) => _store.GetById(id);
 
     public bool Delete(string id) => _store.Remove(id);
+
+    public IReadOnlyList<Product> Search(Func<Product, bool> predicate) => _store.FindAll(predicate);
 }
