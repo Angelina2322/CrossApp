@@ -85,4 +85,15 @@ public sealed class Product
         Create(dto.Id, dto.Sku, dto.Name, dto.Unit, dto.Quantity);
 
     public override string ToString() => $"{Id} [{Sku}] {Name} - {Quantity} {Unit}";
+
+    public void RegisterShipment(int quantity)
+{
+    if (quantity <= 0)
+        throw new ArgumentException("Кількість для відвантаження має бути більшою за нуль.", nameof(quantity));
+
+    if (Quantity < quantity)
+        throw new InvalidOperationException($"Недостатньо товару на складі. Поточний залишок: {Quantity}, запитано: {quantity}.");
+
+    quantity -= quantity;
+}
 }
