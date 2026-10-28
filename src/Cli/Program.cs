@@ -1,33 +1,60 @@
-﻿using Cli;
+﻿using System.Text;
+using Core.Domain;
+using Core.Events;
 using Core.Services;
+using Core.Storage;
 
-// Створення сховища через StoreFactory
-var store = StoreFactory.Create(args);
+Console.OutputEncoding = Encoding.UTF8;
+
+var store = new InMemoryCatalogStore();
 var service = new CatalogService(store);
 
-Console.WriteLine($"=== Сховище: {store.GetType().Name} ===");
+var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "app.log");
+var logDir = Path.GetDirectoryName(logPath);
+if (!string.IsNullOrEmpty(logDir))
+{
+    Directory.CreateDirectory(logDir);
+}
 
+// Перший підписник (локальний метод)
+void OnCatalogChanged(object? sender, CatalogChangedEventArgs e)
+{
+    var line = $"{e.At:HH:mm:ss} {e.Kind,-8} {e.Id} {e.Delta,4:+0;-0} залишок {e.QuantityAfter}";
+    Console.WriteLine(line);
+    File.AppendAllText(logPath, line + Environment.NewLine);
+}
+
+service.Changed += OnCatalogChanged;
+
+// Другий підписник (лямбда із замиканням)
+int changes = 0;
+service.Changed += (_, _) => changes++;
+
+Console.WriteLine("--- Додавання та зміна залишку ---");
+var created = service.Add("SKU-101", "Кабель UTP cat6", "м", 50);
+service.Receive(created.Id, 25);
+Console.WriteLine($"Подій отримано: {changes}");
+
+Console.WriteLine("\n--- Відписка (-=) ---");
+service.Changed -= OnCatalogChanged;
+
+service.Receive(created.Id, 5);
+Console.WriteLine($"Подій отримано: {changes}");
+
+Console.WriteLine("\n--- Сценарій помилки ---");
 try
 {
-    // Демонстрація предикатного пошуку (Func<Product, bool>)
-    Console.WriteLine("\n-> Пошук товарів з залишком > 20 одиниць (Func<Product, bool>):");
-    var surplus = service.Search(p => p.Quantity > 20);
-    foreach (var p in surplus)
-    {
-        Console.WriteLine($"  [{p.Id}] {p.Name,-26} : {p.Quantity} {p.Unit}");
-    }
-
-    Console.WriteLine("\n-> Додаємо новий товар:");
-    var created = service.Add("SKU-EXTRA", "Оптичний конектор", "шт", 100);
-    Console.WriteLine($"Створено: [{created.Id}] {created.Name}");
-
-    Console.WriteLine("\n-> Перевірка наявності в кеші/сховищі:");
-    var found = service.Find(created.Id);
-    Console.WriteLine($"Знайдено: {found?.Name} (кількість: {found?.Quantity})");
+    service.Receive(created.Id, -10);
 }
 catch (Exception ex)
 {
-    Console.ForegroundColor = ConsoleColor.Yellow;
-    Console.WriteLine($"[ПОМИЛКА]: {ex.Message}");
-    Console.ResetColor();
+    Console.WriteLine($"[Очікуваний виняток]: {ex.Message}");
+}
+Console.WriteLine($"Подій після помилки: {changes}");
+
+Console.WriteLine("\n--- Пошук за допомогою Func ---");
+var found = service.FindAll(p => p.Quantity > 50);
+foreach (var product in found)
+{
+    Console.WriteLine($"Знайдено: {product.Name}, залишок: {product.Quantity}");
 }
