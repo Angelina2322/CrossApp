@@ -54,4 +54,40 @@ public sealed class CatalogService
 
     public IReadOnlyList<Product> FindAll(Func<Product, bool> predicate) =>
         _store.List().Where(predicate).ToList();
+
+    // Додаткове завдання 2: метод імпорту розміщено всередині класу
+    public int ImportFromLines(IEnumerable<string> lines, Action<string>? onRowSkipped = null)
+    {
+        int importedCount = 0;
+        int lineIndex = 0;
+
+        foreach (var rawLine in lines)
+        {
+            lineIndex++;
+
+            if (string.IsNullOrWhiteSpace(rawLine))
+            {
+                onRowSkipped?.Invoke($"Рядок {lineIndex}: порожній запис, пропущено.");
+                continue;
+            }
+
+            var parts = rawLine.Split(';');
+            if (parts.Length < 4)
+            {
+                onRowSkipped?.Invoke($"Рядок {lineIndex}: недостатньо колонок ('{rawLine}'), пропущено.");
+                continue;
+            }
+
+            if (!int.TryParse(parts[3], out var quantity) || quantity < 0)
+            {
+                onRowSkipped?.Invoke($"Рядок {lineIndex}: некоректна або від'ємна кількість ('{parts[3]}'), пропущено.");
+                continue;
+            }
+
+            Add(parts[0].Trim(), parts[1].Trim(), parts[2].Trim(), quantity);
+            importedCount++;
+        }
+
+        return importedCount;
+    }
 }

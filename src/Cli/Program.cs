@@ -1,4 +1,6 @@
 ﻿using System.Text;
+using Cli.Sinks;          
+using Core.Abstractions;
 using Core.Domain;
 using Core.Events;
 using Core.Services;
@@ -58,3 +60,28 @@ foreach (var product in found)
 {
     Console.WriteLine($"Знайдено: {product.Name}, залишок: {product.Quantity}");
 }
+
+var sinks = new INotificationSink[]
+{
+    new ConsoleSink(),
+    new FileSink(logPath)
+};
+
+var serviceWithSinks = new CatalogServiceWithSinks(store, sinks);
+
+var rawData = new[]
+{
+    "SKU-201;Патч-корд 1м;шт;10",
+    "НЕКОРЕКТНИЙ_РЯДОК_БЕЗ_РОЗДІЛЬНИКІВ",
+    "SKU-202;Кабель живлення;шт;-5",
+    "SKU-203;Коннектор RJ-45;уп;100"
+};
+
+int imported = service.ImportFromLines(rawData, warning =>
+{
+    Console.ForegroundColor = ConsoleColor.DarkYellow;
+    Console.WriteLine($"[ПОПЕРЕДЖЕННЯ ІМПОРТУ]: {warning}");
+    Console.ResetColor();
+});
+
+Console.WriteLine($"Успішно імпортовано записів: {imported}");
