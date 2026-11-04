@@ -1,87 +1,62 @@
-﻿using System.Text;
-using Cli.Sinks;          
-using Core.Abstractions;
+﻿using Core;
 using Core.Domain;
-using Core.Events;
-using Core.Services;
-using Core.Storage;
+using Core.Reports;
 
-Console.OutputEncoding = Encoding.UTF8;
+var products = SampleData.Products();
 
-var store = new InMemoryCatalogStore();
-var service = new CatalogService(store);
+var command = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "report-top";
 
-var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "app.log");
-var logDir = Path.GetDirectoryName(logPath);
-if (!string.IsNullOrEmpty(logDir))
+switch (command)
 {
-    Directory.CreateDirectory(logDir);
+    case "report-top":
+        Print(ReportService.TopByQuantity(products, 5));
+        break;
+
+    case "report-low":
+        Print(ReportService.LowStock(products, 10));
+        break;
+
+    case "report-groups":
+        foreach (var g in ReportService.ByUnit(products))
+        {
+            Console.WriteLine($"  {g.Key,-6} позицій: {g.Count,3}  сумарно: {g.TotalQuantity,6}");
+        }
+        break;
+
+    case "report-sum":
+        var t = ReportService.Totals(products);
+        Console.WriteLine($"  позицій: {t.Items}, всього: {t.Total}, середнє: {t.Average:F2}, макс: {t.Max}");
+        break;
+
+    case "demo-deferred":
+        RunDeferredExecutionDemo();
+        break;
+
+    default:
+        Console.WriteLine("report-top | report-low | report-groups | report-sum | demo-deferred");
+        break;
 }
 
-// Перший підписник (локальний метод)
-void OnCatalogChanged(object? sender, CatalogChangedEventArgs e)
+static void Print(IReadOnlyList<StockLine> lines)
 {
-    var line = $"{e.At:HH:mm:ss} {e.Kind,-8} {e.Id} {e.Delta,4:+0;-0} залишок {e.QuantityAfter}";
-    Console.WriteLine(line);
-    File.AppendAllText(logPath, line + Environment.NewLine);
+    foreach (var l in lines)
+    {
+        Console.WriteLine($"  {l.Sku,-10} {l.Name,-26} {l.Quantity,6} {l.Unit}");
+    }
 }
 
-service.Changed += OnCatalogChanged;
-
-// Другий підписник (лямбда із замиканням)
-int changes = 0;
-service.Changed += (_, _) => changes++;
-
-Console.WriteLine("--- Додавання та зміна залишку ---");
-var created = service.Add("SKU-101", "Кабель UTP cat6", "м", 50);
-service.Receive(created.Id, 25);
-Console.WriteLine($"Подій отримано: {changes}");
-
-Console.WriteLine("\n--- Відписка (-=) ---");
-service.Changed -= OnCatalogChanged;
-
-service.Receive(created.Id, 5);
-Console.WriteLine($"Подій отримано: {changes}");
-
-Console.WriteLine("\n--- Сценарій помилки ---");
-try
+static void RunDeferredExecutionDemo()
 {
-    service.Receive(created.Id, -10);
+    var source = SampleData.Products().ToList();
+    var query = source.Where(p => p.Quantity < 10);
+
+    Console.WriteLine($"Дефіцитних до змін: {query.Count()}");
+
+    source.Add(Product.Create("tmp00001", "SKU-999", "Скоба", "шт", 3));
+    Console.WriteLine($"Дефіцитних після змін: {query.Count()}");
+
+    var snapshot = query.ToList();
+    source.Clear();
+
+    Console.WriteLine($"У знімку лишилось: {snapshot.Count}");
 }
-catch (Exception ex)
-{
-    Console.WriteLine($"[Очікуваний виняток]: {ex.Message}");
-}
-Console.WriteLine($"Подій після помилки: {changes}");
-
-Console.WriteLine("\n--- Пошук за допомогою Func ---");
-var found = service.FindAll(p => p.Quantity > 50);
-foreach (var product in found)
-{
-    Console.WriteLine($"Знайдено: {product.Name}, залишок: {product.Quantity}");
-}
-
-var sinks = new INotificationSink[]
-{
-    new ConsoleSink(),
-    new FileSink(logPath)
-};
-
-var serviceWithSinks = new CatalogServiceWithSinks(store, sinks);
-
-var rawData = new[]
-{
-    "SKU-201;Патч-корд 1м;шт;10",
-    "НЕКОРЕКТНИЙ_РЯДОК_БЕЗ_РОЗДІЛЬНИКІВ",
-    "SKU-202;Кабель живлення;шт;-5",
-    "SKU-203;Коннектор RJ-45;уп;100"
-};
-
-int imported = service.ImportFromLines(rawData, warning =>
-{
-    Console.ForegroundColor = ConsoleColor.DarkYellow;
-    Console.WriteLine($"[ПОПЕРЕДЖЕННЯ ІМПОРТУ]: {warning}");
-    Console.ResetColor();
-});
-
-Console.WriteLine($"Успішно імпортовано записів: {imported}");

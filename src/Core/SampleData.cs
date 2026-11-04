@@ -4,6 +4,7 @@ namespace Core;
 
 public static class SampleData
 {
+    // Метод: SampleData.Products()
     public static List<Product> Products() =>
     [
         Product.Create("prod-001", "SKU-101", "Кабель UTP cat6", "м", 150),
@@ -22,4 +23,7 @@ public static class SampleData
         Product.Create("prod-014", "SKU-114", "Тестер мережевий кабельний", "шт", 6),
         Product.Create("prod-015", "SKU-115", "Стяжки кабельні 100мм", "пач", 40)
     ];
+
+    // Властивість про всяк випадок (якщо десь викликається без дужок)
+    public static List<Product> ProductsList => Products();
 }
