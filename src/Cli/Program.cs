@@ -1,6 +1,7 @@
 ﻿using Core;
 using Core.Domain;
 using Core.Reports;
+using System.Diagnostics;
 
 var products = SampleData.Products();
 
@@ -32,8 +33,12 @@ switch (command)
         RunDeferredExecutionDemo();
         break;
 
+    case "bench":
+        RunBenchmark();
+        break;
+
     default:
-        Console.WriteLine("report-top | report-low | report-groups | report-sum | demo-deferred");
+        Console.WriteLine("report-top | report-low | report-groups | report-sum | demo-deferred | bench");
         break;
 }
 
@@ -59,4 +64,48 @@ static void RunDeferredExecutionDemo()
     source.Clear();
 
     Console.WriteLine($"У знімку лишилось: {snapshot.Count}");
+}
+
+static void RunBenchmark()
+{
+    Console.WriteLine("Генерація 100 000 записів для тестування...");
+    var random = new Random(42);
+    var largeDataset = Enumerable.Range(1, 100_000)
+        .Select(i => Product.Create(
+            $"id-{i}",
+            $"SKU-{i:D6}",
+            $"Товар {i}",
+            i % 2 == 0 ? "шт" : "м",
+            random.Next(1, 1000)))
+        .ToList();
+
+    Console.WriteLine("Запуск тестів (100 000 записів)...");
+
+    // Варіант А: Чистий потоковий ланцюжок (без зайвого ToList посередині)
+    var sw = Stopwatch.StartNew();
+    var resultA = largeDataset
+        .Where(p => p.Quantity < 500)
+        .Select(p => new StockLine(p.Sku, p.Name, p.Quantity, p.Unit))
+        .OrderByDescending(p => p.Quantity)
+        .Take(10)
+        .ToList(); // фінальна матеріалізація
+    sw.Stop();
+    var elapsedStreaming = sw.ElapsedMilliseconds;
+
+    // Варіант Б: Із проміжним ToList() у середині ланцюжка
+    sw.Restart();
+    var resultB = largeDataset
+        .Where(p => p.Quantity < 500)
+        .ToList() // ПРОМІЖНИЙ ToList(): виділяє масив під десятки тисяч елементів!
+        .Select(p => new StockLine(p.Sku, p.Name, p.Quantity, p.Unit))
+        .OrderByDescending(p => p.Quantity)
+        .Take(10)
+        .ToList();
+    sw.Stop();
+    var elapsedWithMiddleToList = sw.ElapsedMilliseconds;
+
+    Console.WriteLine($"\n--- Результати замірів (Stopwatch) ---");
+    Console.WriteLine($"1. Без ToList посередині (streaming):  {elapsedStreaming} ms");
+    Console.WriteLine($"2. З проміжним ToList() у середині:     {elapsedWithMiddleToList} ms");
+    Console.WriteLine($"Різниця: варіант без ToList() швидший і не створює зайвих алокацій у GC.");
 }

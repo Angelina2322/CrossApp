@@ -38,4 +38,57 @@ public static class ReportService
                list.Average(p => p.Quantity), 
                list.Max(p => p.Quantity));
     }
+
+
+// 5) GroupJoin: товари x переміщення з агрегацією
+public static IReadOnlyList<ProductMovementSummary> MovementsByProduct(
+    IEnumerable<Product> products,
+    IEnumerable<StockMovement> movements) =>
+    products.GroupJoin(
+        movements,
+        p => p.Sku,
+        m => m.Sku,
+        (product, productMovements) => new ProductMovementSummary(
+            product.Sku,
+            product.Name,
+            product.Quantity,
+            productMovements.Count(),
+            productMovements.Sum(m => m.Quantity)
+        ),
+        StringComparer.OrdinalIgnoreCase
+    )
+    .OrderByDescending(p => p.TotalMovedQuantity)
+    .ThenBy(p => p.Sku, StringComparer.Ordinal)
+    .ToList();
+
+    
+
+    // Використання 1: Топ залишків
+public static IReadOnlyList<StockLine> TopStockWithExtension(IEnumerable<Product> source, int n) =>
+    source.TopBy(p => p.Quantity, p => p.Sku, n)
+          .Select(p => new StockLine(p.Sku, p.Name, p.Quantity, p.Unit))
+          .ToList();
+
+// Використання 2: Топ переміщених товарів (для об'єднаного звіту)
+public static IReadOnlyList<ProductMovementSummary> TopMovedProducts(
+    IEnumerable<Product> products,
+    IEnumerable<StockMovement> movements,
+    int n) =>
+    MovementsByProduct(products, movements)
+        .TopBy(m => m.TotalMovedQuantity, m => m.Sku, n)
+        .ToList();
+        
+
+        // Версія звітного методу ByUnit у синтаксисі запитів (Query Syntax)
+public static IReadOnlyList<GroupSummary> ByUnitQuerySyntax(IEnumerable<Product> source)
+{
+    var query = from p in source
+                group p by p.Unit into g
+                let total = g.Sum(x => x.Quantity)
+                orderby total descending
+                select new GroupSummary(g.Key, g.Count(), total);
+
+    return query.ToList();
+}
+
 }
