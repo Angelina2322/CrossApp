@@ -11,7 +11,6 @@ public sealed class CatalogServiceWithSinks
 {
     private readonly ICatalogStore _store;
     private readonly IReadOnlyList<INotificationSink> _sinks;
-
     public CatalogServiceWithSinks(ICatalogStore store, IEnumerable<INotificationSink> sinks)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

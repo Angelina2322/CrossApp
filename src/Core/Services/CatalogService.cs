@@ -90,4 +90,25 @@ public sealed class CatalogService
 
         return importedCount;
     }
+
+public async Task<int> ImportAsync(ICatalogImporter importer, string path, CancellationToken ct = default)
+{
+    var items = await importer.LoadAsync(path, ct);
+    var added = 0;
+
+    foreach (var item in items)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        // Ідемпотентність імпорту: якщо товар уже є, пропускаємо його
+        if (_store.GetById(item.Id) is not null)
+            continue;
+
+        _store.Add(item);
+        OnChanged(item, CatalogChangeKind.Added, item.Quantity);
+        added++;
+    }
+
+    return added;
+}
 }
