@@ -5,11 +5,9 @@ using Core;
 using Core.Services;
 using Core.Storage;
 
-// 1. Ініціалізуємо сховище та сервіс (ручний DI з попередніх робіт)
-var store = new FileCatalogStore("data/catalog.json"); // або JsonCatalogStore / InMemoryCatalogStore, як у вас названо
+var store = new InMemoryCatalogStore(); // або FileCatalogStore
 var service = new CatalogService(store);
 
-// 2. Налаштування токена скасування та перехоплення Ctrl+C
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
 {
@@ -17,26 +15,30 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-// Для перевірки таймауту за потреби:
-// cts.CancelAfter(TimeSpan.FromSeconds(2));
+string dataPath = args.Length > 0 ? args[0] : "data/products.json";
 
-string dataPath = args.Length > 0 ? args[0] : "data/import.json";
+// Підписник на прогрес: оновлює один і той самий рядок у консолі
+var progress = new Progress<double>(percent =>
+{
+    Console.Write($"\rПрогрес імпорту: {percent:F1}%");
+});
 
 try
 {
     var importer = new JsonCatalogImporter();
-    var added = await service.ImportAsync(importer, dataPath, cts.Token);
-    Console.WriteLine($"Імпортовано записів: {added}");
+    var added = await service.ImportWithProgressAsync(importer, dataPath, progress, cts.Token);
+    
+    Console.WriteLine($"\nІмпорт успішно завершено! Додано записів: {added}");
 }
 catch (OperationCanceledException)
 {
-    Console.WriteLine("Імпорт скасовано.");
+    Console.WriteLine("\nІмпорт скасовано.");
 }
 catch (DomainException ex)
 {
-    Console.WriteLine($"Дані відхилено: {ex.Message}");
+    Console.WriteLine($"\nДані відхилено: {ex.Message}");
 }
 catch (FileNotFoundException)
 {
-    Console.WriteLine($"Файл не знайдено: {dataPath}");
+    Console.WriteLine($"\nФайл не знайдено: {dataPath}");
 }

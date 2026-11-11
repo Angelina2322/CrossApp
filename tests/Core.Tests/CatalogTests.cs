@@ -105,4 +105,38 @@ public class CatalogTests
             }
         }
     }
+    [Fact]
+public async Task ImportAsync_LinkedToken_WhenTimeoutExpires_CancelsByTimeout()
+{
+    var tempFile = Path.GetTempFileName();
+    try
+    {
+        // 1. Токен користувача (ручний сигнал)
+        using var userCts = new CancellationTokenSource();
+
+        // 2. Токен таймауту на 20 мілісекунд
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(20));
+
+        // 3. Зв'язане джерело токенів
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(userCts.Token, timeoutCts.Token);
+
+        // Чекаємо трохи довше за таймаут, щоб гарантовано спрацював саме він
+        await Task.Delay(50);
+
+        var service = new CatalogService(new InMemoryCatalogStore());
+
+        // Перевіряємо, що кидається OperationCanceledException
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.ImportAsync(new JsonCatalogImporter(), tempFile, linkedCts.Token));
+
+        // ДОКАЗ: спрацював саме таймаут, а користувацький токен залишився нескасованим
+        Assert.True(timeoutCts.IsCancellationRequested, "Таймаут мав спрацювати.");
+        Assert.False(userCts.IsCancellationRequested, "Користувач не ініціював скасування.");
+        Assert.True(linkedCts.IsCancellationRequested, "Зв'язаний токен має бути в стані скасування.");
+    }
+    finally
+    {
+        if (File.Exists(tempFile)) File.Delete(tempFile);
+    }
+}
 }
