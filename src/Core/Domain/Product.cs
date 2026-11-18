@@ -67,10 +67,19 @@ public sealed class Product
         _quantity -= amount;
     }
 
+    /// <summary>
+    /// Перетворює доменну сутність у DTO для серіалізації у JSON.
+    /// </summary>
     public ProductDto ToDto() => new(Id, Sku, Name, Unit, Quantity);
 
-    public static Product FromDto(ProductDto dto) =>
-        Create(dto.Id, dto.Sku, dto.Name, dto.Unit, dto.Quantity);
+    /// <summary>
+    /// Відновлює доменну сутність із DTO з повторною перевіркою інваріантів.
+    /// </summary>
+    public static Product FromDto(ProductDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        return Create(dto.Id, dto.Sku, dto.Name, dto.Unit, dto.Quantity);
+    }
 
     public override string ToString() => $"{Id} [{Sku}] {Name} {Quantity} {Unit}";
 }

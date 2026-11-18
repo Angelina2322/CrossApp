@@ -95,3 +95,36 @@ Core збирається лише під net10.0 (multi-targeting net8.0;net10.
 Легше дозволяє підставляти настроювані компаратори (наприклад, StringComparer.OrdinalIgnoreCase), що у синтаксисі запитів вимагає додаткових конструкцій.
 
 Висновок: Для стандартних конвеєрів звітів синтаксис методів є більш гнучким і лаконічним у C#, тоді як Query Syntax виграє у читабельності при множинних join та агрегаціях з group into.
+
+## Конфігурація та змінні середовища
+
+Застосунок завантажує налаштування у такому порядку пріоритету (кожне наступне джерело перекриває попереднє):
+1. `appsettings.json` (базові налаштування)
+2. `appsettings.{CROSSAPP_ENVIRONMENT}.json` (профіль середовища: `Development` або `Production`)
+3. `User Secrets` (локальні секрети розробника поза репозиторієм)
+4. Змінні середовища з префіксом `CROSSAPP_` та `CROSSAPP_DATA_PATH`
+5. Аргументи командного рядка (`--Storage:DataPath=...`)
+
+### Профілі запуску
+* **`Development`** (за замовчуванням): рівень логування `Debug`, файл даних `items.dev.json`.
+* **`Production`**: рівень логування `Warning`, файл даних `items.json`.
+
+### Таблиця ключів конфігурації
+
+| Ключ у `appsettings.json` | Змінна середовища | Опис | Значення за замовчуванням |
+| :--- | :--- | :--- | :--- |
+| `EnvironmentName` | `CROSSAPP_ENVIRONMENT` | Активний профіль середовища | `"Development"` |
+| `Logging:MinimumLevel` | `CROSSAPP_Logging__MinimumLevel` | Мінімальний рівень логування | `"Warning"` |
+| `Storage:DataPath` | `CROSSAPP_Storage__DataPath` або `CROSSAPP_DATA_PATH` | Каталог збереження даних | `"data"` |
+| `Storage:FileName` | `CROSSAPP_Storage__FileName` | Ім'я JSON-файлу каталогу | `"items.json"` |
+| `Warehouse:DefaultUnit` | `CROSSAPP_Warehouse__DefaultUnit` | Одиниця виміру за замовчуванням | `"шт"` |
+| `Integration:ApiKey` | `CROSSAPP_Integration__ApiKey` *(або `user-secrets`)* | API-ключ інтеграції (секрет) | *не задано* |
+
+### Приклади перевизначення змінних
+
+**PowerShell (Windows):**
+```powershell
+$env:CROSSAPP_ENVIRONMENT = "Production"
+$env:CROSSAPP_DATA_PATH = "C:\Temp\CrossAppData"
+$env:CROSSAPP_Integration__ApiKey = "prod-secret-key"
+dotnet run --project src/Cli -- export
