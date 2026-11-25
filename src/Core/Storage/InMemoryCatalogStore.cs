@@ -6,6 +6,7 @@ namespace Core.Storage;
 public sealed class InMemoryCatalogStore : ICatalogStore
 {
     private readonly Dictionary<string, Product> _items;
+    private readonly object _lock = new();
 
     public InMemoryCatalogStore(IEnumerable<Product>? seed = null)
     {
@@ -13,33 +14,52 @@ public sealed class InMemoryCatalogStore : ICatalogStore
             .ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
     }
 
-    public IReadOnlyList<Product> List() => _items.Values.ToList();
+    public IReadOnlyList<Product> List()
+    {
+        lock (_lock)
+            return _items.Values.ToList();
+    }
 
-    public Product? GetById(string id) => _items.GetValueOrDefault(id);
+    public Product? GetById(string id)
+    {
+        lock (_lock)
+            return _items.GetValueOrDefault(id);
+    }
 
     public void Add(Product item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        if (_items.ContainsKey(item.Id))
-            throw new InvalidOperationException($"Запис з id={item.Id} уже існує.");
+        lock (_lock)
+        {
+            if (_items.ContainsKey(item.Id))
+                throw new InvalidOperationException($"Запис з id={item.Id} уже існує.");
 
-        _items.Add(item.Id, item);
+            _items.Add(item.Id, item);
+        }
     }
 
     public void Update(Product item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        if (!_items.ContainsKey(item.Id))
-            throw new InvalidOperationException($"Запис з id={item.Id} не знайдено для оновлення.");
+        lock (_lock)
+        {
+            if (!_items.ContainsKey(item.Id))
+                throw new InvalidOperationException($"Запис з id={item.Id} не знайдено для оновлення.");
 
-        _items[item.Id] = item;
+            _items[item.Id] = item;
+        }
     }
 
-    public bool Remove(string id) => _items.Remove(id);
+    public bool Remove(string id)
+    {
+        lock (_lock)
+            return _items.Remove(id);
+    }
 
-public IReadOnlyList<Product> FindAll(Func<Product, bool> predicate)
-{
-    ArgumentNullException.ThrowIfNull(predicate);
-    return _items.Values.Where(predicate).ToList();
-}
+    public IReadOnlyList<Product> FindAll(Func<Product, bool> predicate)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        lock (_lock)
+            return _items.Values.Where(predicate).ToList();
+    }
 }

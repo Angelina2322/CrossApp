@@ -1,0 +1,56 @@
+@Api_HostAddress = http://localhost:5080
+
+### 1. Health check
+GET {{Api_HostAddress}}/health
+
+### 2. Отримати всі товари (порожній список)
+GET {{Api_HostAddress}}/api/products
+
+### 3. Створити товар (201 Created)
+# @name createProduct
+POST {{Api_HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "A-100",
+  "name": "Цемент М400",
+  "unit": "мішок",
+  "quantity": 40
+}
+
+###
+@productId = {{createProduct.response.body.id}}
+
+### 4. Отримати створений товар за ID (200 OK)
+GET {{Api_HostAddress}}/api/products/{{productId}}
+
+### 5. Перевірити валідацію (400 Bad Request + ValidationProblemDetails)
+POST {{Api_HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "",
+  "name": "X",
+  "unit": "",
+  "quantity": -1
+}
+
+### 6. Оновити товар (200 OK)
+PUT {{Api_HostAddress}}/api/products/{{productId}}
+Content-Type: application/json
+
+{
+  "sku": "A-100",
+  "name": "Цемент М500",
+  "unit": "мішок",
+  "quantity": 3
+}
+
+### 7. Перевірити low-stock (threshold=5)
+GET {{Api_HostAddress}}/api/products/low-stock?threshold=5
+
+### 8. Видалити товар (204 No Content)
+DELETE {{Api_HostAddress}}/api/products/{{productId}}
+
+### 9. Перевірити, що після видалення повертається 404 Not Found
+GET {{Api_HostAddress}}/api/products/{{productId}}

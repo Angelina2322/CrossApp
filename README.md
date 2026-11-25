@@ -128,3 +128,9 @@ $env:CROSSAPP_ENVIRONMENT = "Production"
 $env:CROSSAPP_DATA_PATH = "C:\Temp\CrossAppData"
 $env:CROSSAPP_Integration__ApiKey = "prod-secret-key"
 dotnet run --project src/Cli -- export
+
+## Запуск Web API (Лабораторна робота 10)
+
+Запуск сервера на фіксованому порту `5080`:
+```bash
+dotnet run --project src/Api --urls http://localhost:5080
